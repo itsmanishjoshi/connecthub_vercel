@@ -493,6 +493,7 @@ async def people_from_spreadsheet_buffer(
         )
 
     photos = _extract_embedded_sheet_photos(buffer)
+    serverless = bool(os.getenv("VERCEL") or os.getenv("VERCEL_URL"))
     if photos:
         attached = 0
         for person in collected:
@@ -501,9 +502,17 @@ async def people_from_spreadsheet_buffer(
             image = photos.get(person.get("_sheet_row"))
             if not image:
                 continue
+            if serverless:
+                attached += 1
+                continue
             person["profile_pic_url"] = to_data_url(image)
             attached += 1
-        if attached:
+        if attached and serverless:
+            warnings.append(
+                f"Found {attached} embedded profile {'photo' if attached == 1 else 'photos'}. "
+                "On cloud hosting, save the roster first, then click Import photos from Excel."
+            )
+        elif attached:
             warnings.append(
                 f"Imported {attached} profile {'photo' if attached == 1 else 'photos'} from the spreadsheet."
             )

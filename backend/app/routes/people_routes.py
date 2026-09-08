@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any, List, Optional
@@ -8,6 +9,7 @@ from typing import Any, List, Optional
 import asyncpg
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import Response
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
 from app.database import get_pool
@@ -254,6 +256,12 @@ class UploadFileWrapper:
         return self.buffer
 
 
+def _max_upload_bytes() -> int:
+    if os.getenv("VERCEL") or os.getenv("VERCEL_URL"):
+        return 4 * 1024 * 1024
+    return 32 * 1024 * 1024
+
+
 @router.post("/api/events/{event_id}/people/extract")
 async def people_extract(
     event_id: str,
@@ -269,8 +277,16 @@ async def people_extract(
         settings.ingest_upload_dir.mkdir(parents=True, exist_ok=True)
         upload_list = files or []
         wrapped_files = []
+        max_bytes = _max_upload_bytes()
         for upload in upload_list:
             data = await upload.read()
+            if len(data) > max_bytes:
+                raise api_error(
+                    413,
+                    f"File too large ({len(data) // (1024 * 1024)} MB). "
+                    f"Cloud import supports up to {max_bytes // (1024 * 1024)} MB. "
+                    "Try CSV without embedded photos.",
+                )
             wrapped_files.append(UploadFileWrapper(upload, data))
             safe = re.sub(r"[^\w.\- ()]", "_", str(upload.filename or "upload.xlsx"))
             if re.search(r"\.(xlsx|xls|csv)$", safe, re.I):
@@ -319,10 +335,13 @@ async def people_extract(
             "warnings": result.get("warnings") or [],
             "sourceKinds": result.get("sourceKinds") or [],
         }
+    except StarletteHTTPException:
+        raise
     except Exception as error:
-        status = getattr(error, "status", 500)
-        print(f"people extract failed: {error}")
-        raise api_error(status, str(error) or "Could not read people from that source")
+        status = int(getattr(error, "status_code", None) or getattr(error, "status", 500) or 500)
+        message = str(error).strip() or error.__class__.__name__
+        print(f"people extract failed: {error!r}")
+        raise api_error(status, message or "Could not read people from that source")
 
 
 @router.post("/api/events/{event_id}/people/commit")
@@ -363,6 +382,13 @@ async def people_import_photos(
     if file and file.filename:
         buffer = await file.read()
         filename = file.filename
+        max_bytes = _max_upload_bytes()
+        if len(buffer) > max_bytes:
+            raise api_error(
+                413,
+                f"File too large ({len(buffer) // (1024 * 1024)} MB). "
+                f"Cloud import supports up to {max_bytes // (1024 * 1024)} MB.",
+            )
     elif DEFAULT_INGEST_XLSX.is_file():
         buffer = DEFAULT_INGEST_XLSX.read_bytes()
         filename = DEFAULT_INGEST_XLSX.name
