@@ -8,6 +8,7 @@ import asyncpg
 from app.config import settings
 from app.database import get_pool
 from app.services.ai_router import configured_providers, describe_ai_routing, is_ai_configured
+from app.services import supabase_storage
 
 router = APIRouter()
 
@@ -38,10 +39,12 @@ def _database_hint(error: Exception) -> str:
 @router.get("/api/health")
 async def health():
     ai_status = "configured" if is_ai_configured() else "missing"
+    ingest_storage = supabase_storage.describe_storage()
     result = {
         "application": "ok",
         "database": "error",
         "storage": "ok",
+        "ingestStorage": ingest_storage,
         "ai": ai_status,
     }
     if is_ai_configured():

@@ -28,6 +28,7 @@ from app.services.people_ingest import (
 )
 from app.services.photo_import import DEFAULT_INGEST_XLSX, import_event_photos_from_spreadsheet
 from app.services.remote_photo import resolve_attendee_photo, resolve_photo_bytes
+from app.services import supabase_storage
 
 router = APIRouter()
 
@@ -398,6 +399,43 @@ async def people_commit(
         raise api_error(500, str(error) or "Could not save people")
 
 
+@router.post("/api/events/{event_id}/people/ingest-upload-url")
+async def people_ingest_upload_url(
+    event_id: str,
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_pool),
+):
+    user = await authenticate(request, pool)
+    require_admin(user)
+    await require_event_role(pool, user, event_id, "edit")
+    if not supabase_storage.is_configured():
+        raise api_error(
+            503,
+            "Supabase Storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel.",
+        )
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    filename = str(body.get("filename") or "roster.xlsx")
+    file_size = int(body.get("fileSize") or 0)
+    max_bytes = supabase_storage.max_ingest_file_bytes()
+    if file_size <= 0:
+        raise api_error(400, "fileSize is required")
+    if file_size > max_bytes:
+        raise api_error(
+            413,
+            f"File too large ({file_size // (1024 * 1024)} MB). "
+            f"Supabase ingest supports up to {max_bytes // (1024 * 1024)} MB.",
+        )
+    try:
+        object_path = supabase_storage.build_ingest_object_path(event_id, filename)
+        signed = await supabase_storage.create_signed_upload_url(object_path)
+        return signed
+    except Exception as error:
+        raise api_error(500, str(error) or "Could not prepare cloud upload")
+
+
 @router.post("/api/events/{event_id}/people/import-photos")
 async def people_import_photos(
     event_id: str,
@@ -411,11 +449,27 @@ async def people_import_photos(
 
     buffer: bytes | None = None
     filename = "ingest-last.xlsx"
-    if file and file.filename:
+    storage_path: str | None = None
+    content_type = (request.headers.get("content-type") or "").lower()
+
+    if "application/json" in content_type:
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        storage_path = str(body.get("storagePath") or "").strip() or None
+        filename = str(body.get("filename") or "roster.xlsx")
+    elif file and file.filename:
         buffer = await file.read()
         filename = file.filename
         max_bytes = _max_upload_bytes()
         if len(buffer) > max_bytes:
+            if supabase_storage.is_configured():
+                raise api_error(
+                    413,
+                    f"File too large ({len(buffer) // (1024 * 1024)} MB) for direct API upload. "
+                    "The app will retry via Supabase Storage automatically.",
+                )
             raise api_error(
                 413,
                 f"File too large ({len(buffer) // (1024 * 1024)} MB). "
@@ -425,6 +479,17 @@ async def people_import_photos(
         buffer = DEFAULT_INGEST_XLSX.read_bytes()
         filename = DEFAULT_INGEST_XLSX.name
 
+    if storage_path:
+        if not supabase_storage.is_configured():
+            raise api_error(503, "Supabase Storage is not configured")
+        try:
+            supabase_storage.validate_ingest_object_path(storage_path, event_id)
+            buffer = await supabase_storage.download_object(storage_path)
+        except ValueError as error:
+            raise api_error(400, str(error))
+        except Exception as error:
+            raise api_error(500, str(error) or "Could not download ingest file from storage")
+
     if not buffer:
         raise api_error(
             400,
@@ -432,14 +497,21 @@ async def people_import_photos(
         )
 
     try:
-        return await import_event_photos_from_spreadsheet(
+        result = await import_event_photos_from_spreadsheet(
             pool,
             event_id,
             buffer,
             filename=filename,
         )
+        return result
     except Exception as error:
         raise api_error(500, str(error) or "Could not import photos from that file")
+    finally:
+        if storage_path:
+            try:
+                await supabase_storage.delete_object(storage_path)
+            except Exception:
+                pass
 
 
 @router.get("/api/photos/proxy")

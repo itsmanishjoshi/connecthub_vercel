@@ -185,7 +185,6 @@ const Landing = () => {
     const cached = await readCachedEvents();
     if (cached?.data?.length) {
       setEvents(cached.data);
-      setCachedAt(cached.savedAt);
       setLoading(false);
     } else {
       setLoading(true);
@@ -195,7 +194,7 @@ const Landing = () => {
       const result = await fetchEventsWithSource();
       const data = result.data;
       setCachedAt(result.source === 'cache' ? result.cachedAt || Date.now() : null);
-      setEvents(data && data.length > 0 ? data : []);
+      setEvents(data?.length ? data : cached?.data?.length ? cached.data : []);
     } catch (error) {
       console.error('Failed to load events:', error);
       setEvents([]);
@@ -441,7 +440,10 @@ const Landing = () => {
                     role="status"
                     className="mb-4 rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
                   >
-                    Offline: showing events saved on {new Date(cachedAt).toLocaleString()}. Changes to events require a connection.
+                    {navigator.onLine
+                      ? `Could not refresh events — showing your saved copy from ${new Date(cachedAt).toLocaleString()}.`
+                      : `Offline: showing events saved on ${new Date(cachedAt).toLocaleString()}.`}{' '}
+                    Changes to events require a connection.
                   </div>
                 )}
                                 

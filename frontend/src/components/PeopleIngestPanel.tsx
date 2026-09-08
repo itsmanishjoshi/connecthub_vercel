@@ -213,7 +213,7 @@ export function PeopleIngestPanel({ eventId, onSaved }: PeopleIngestPanelProps) 
               disabled={busy !== null}
             >
               {busy === 'photos' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
-              {busy === 'photos' ? 'Importing photos…' : 'Import photos from Excel'}
+              {busy === 'photos' ? 'Uploading & importing photos…' : 'Import photos from Excel'}
             </Button>
           </>
         ) : null}

@@ -69,6 +69,56 @@ async function previewIngestedPeople(eventId: string, people: IngestedPerson[]) 
   return (await response.json()) as { people: IngestedPerson[]; warnings: string[] };
 }
 
+async function requestIngestUploadUrl(eventId: string, file: File) {
+  const response = await fetch(`${apiBase()}/api/events/${eventId}/people/ingest-upload-url`, {
+    method: 'POST',
+    headers: {
+      ...authHeaders(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      filename: file.name,
+      fileSize: file.size,
+      purpose: 'photos',
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(await readApiError(response, 'Could not start cloud upload'));
+  }
+  return (await response.json()) as {
+    signedUrl: string;
+    token: string;
+    storagePath: string;
+  };
+}
+
+async function uploadFileToSignedUrl(file: File, signedUrl: string, token: string) {
+  const response = await fetch(signedUrl, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type':
+        file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'x-upsert': 'true',
+    },
+    body: file,
+  });
+  if (!response.ok) {
+    const detail = (await response.text().catch(() => '')).slice(0, 160);
+    throw new Error(
+      detail
+        ? `Cloud upload failed: ${detail}`
+        : 'Cloud upload failed. Check Supabase Storage settings in Vercel and try again.',
+    );
+  }
+}
+
+export async function uploadSpreadsheetViaSupabase(eventId: string, file: File) {
+  const { signedUrl, token, storagePath } = await requestIngestUploadUrl(eventId, file);
+  await uploadFileToSignedUrl(file, signedUrl, token);
+  return storagePath;
+}
+
 async function parseSpreadsheetsLocally(eventId: string, uploadFiles: File[]) {
   const localPeople: IngestedPerson[] = [];
   for (const file of uploadFiles) {
@@ -82,7 +132,7 @@ async function parseSpreadsheetsLocally(eventId: string, uploadFiles: File[]) {
   const warnings = [...(preview.warnings || [])];
   if (largest > CLOUD_UPLOAD_LIMIT_BYTES) {
     warnings.unshift(
-      `${uploadFiles.map((file) => file.name).join(', ')} (${formatFileSize(largest)}) was read in your browser to avoid cloud upload limits. Save the roster, then use Import photos from Excel for embedded photos.`,
+      `${uploadFiles.map((file) => file.name).join(', ')} (${formatFileSize(largest)}) was read in your browser. Save the roster, then use Import photos from Excel — large files upload via Supabase Storage.`,
     );
   } else {
     warnings.unshift('Roster parsed locally from Excel/CSV.');
@@ -145,11 +195,27 @@ export async function commitIngestedPeople(eventId: string, people: IngestedPers
 
 export async function importPhotosFromSpreadsheet(eventId: string, file?: File) {
   if (file && file.size > CLOUD_UPLOAD_LIMIT_BYTES) {
-    throw new Error(
-      `"${file.name}" is too large for photo import (${formatFileSize(file.size)}). ` +
-        'Remove embedded images from the Excel file and re-add photos from each person card, or run photo import from a local/office server.',
-    );
+    const storagePath = await uploadSpreadsheetViaSupabase(eventId, file);
+    const response = await fetch(`${apiBase()}/api/events/${eventId}/people/import-photos`, {
+      method: 'POST',
+      headers: {
+        ...authHeaders(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ storagePath, filename: file.name }),
+    });
+    if (!response.ok) {
+      throw new Error(await readApiError(response, 'Could not import photos from Excel'));
+    }
+    return (await response.json()) as {
+      saved: number;
+      skipped: number;
+      unmatched: string[];
+      embedded_photos_in_file: number;
+      people_in_file: number;
+    };
   }
+
   const body = new FormData();
   if (file) body.append('file', file);
   const response = await fetch(`${apiBase()}/api/events/${eventId}/people/import-photos`, {

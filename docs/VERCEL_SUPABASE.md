@@ -7,10 +7,10 @@ Use this when the office server is VPN-only and you need access from anywhere.
 | Piece | Service |
 |-------|---------|
 | UI + API routing | **Vercel** (one project, two services) |
-| Database | **Supabase Postgres** (`DATABASE_URL` only) |
+| Database | **Supabase Postgres** (`DATABASE_URL`) + **Storage** (large Excel ingest) |
 | AI (Jelly) | **Azure OpenAI** (`AZURE_OPENAI_*`) |
 
-The browser still talks to `/api` on your Vercel domain. Supabase is **Postgres only** — the app does not use Supabase Auth or Supabase Storage SDKs.
+The browser still talks to `/api` on your Vercel domain. Supabase is **Postgres + Storage for large Excel ingest** — the app does not use Supabase Auth or the Supabase JS SDK in the browser.
 
 ---
 
@@ -28,13 +28,28 @@ python scripts/migrate.py migrate
 python scripts/migrate.py seed
 ```
 
-5. Copy the same `DATABASE_URL` into Vercel env vars (step 3 below).
+5. Copy the same `DATABASE_URL` into Vercel env vars (step 4 below).
 
 **Import existing data (events, people, photos):** see [exports/README.md](../exports/README.md). Run `npm run db:export` against your source database, then paste or `psql` the generated `exports/connecthub-dump.sql` into Supabase. Attendee `.png`/`.jpg` photos are embedded as database bytes; event images become inline `data:image/...` URLs.
 
 ---
 
-## 2. Azure OpenAI
+## 2. Supabase Storage (large Excel photo import)
+
+Large speaker rosters with embedded photos (often 15–50 MB) cannot pass through Vercel’s ~4 MB API upload limit. ConnectHub uploads those files **directly to Supabase Storage**, then the backend downloads and imports photos into Postgres.
+
+1. In Supabase Dashboard → **Project Settings → API**, copy:
+   - **Project URL** → `SUPABASE_URL`
+   - **service_role** key → `SUPABASE_SERVICE_ROLE_KEY` (backend only — never expose as `VITE_*`)
+2. Add both to **Vercel → Environment Variables** (Production + Preview).
+3. The backend auto-creates a private bucket `ingest-uploads` on first use (max **100 MB** per file by default).
+4. After deploy, confirm `/api/health` includes `"ingestStorage": { "configured": true, ... }`.
+
+**User flow on Vercel:** Stage 1 reads roster text in the browser → Save selected people → **Import photos from Excel** uploads the large `.xlsx` to Supabase Storage, then imports embedded photos into attendee records.
+
+---
+
+## 3. Azure OpenAI
 
 1. In [Azure Portal](https://portal.azure.com), open your Azure OpenAI resource.
 2. Copy the **endpoint** and **API key** from Keys and Endpoint.
@@ -56,7 +71,7 @@ Remove any old `GROQ_*`, `GROK_*`, `OPENROUTER_*`, `GEMINI_*`, or `MISTRAL_*` va
 
 ---
 
-## 3. Vercel project setup
+## 4. Vercel project setup
 
 1. Import git repo: `https://coresync.e-zest.in/manish.joshi/connecthub.git`
 2. **Root Directory:** `./` (repo root — `vercel.json` is already there)
@@ -70,6 +85,8 @@ Remove any old `GROQ_*`, `GROK_*`, `OPENROUTER_*`, `GEMINI_*`, or `MISTRAL_*` va
 | `ADMIN_USERNAME` | Yes | |
 | `ADMIN_PASSWORD` | Yes | |
 | `ADMIN_EMAIL` | Yes | |
+| `SUPABASE_URL` | For large Excel photo import | Project URL from Supabase API settings |
+| `SUPABASE_SERVICE_ROLE_KEY` | For large Excel photo import | service_role key (server only) |
 | `NODE_ENV` | Yes | `production` |
 | `ALLOWED_ORIGINS` | Yes | `https://your-project.vercel.app` |
 | `AI_PROVIDER` | Yes | `azure` |
@@ -87,7 +104,7 @@ Remove any old `GROQ_*`, `GROK_*`, `OPENROUTER_*`, `GEMINI_*`, or `MISTRAL_*` va
 
 ---
 
-## 4. Verify
+## 5. Verify
 
 ```text
 https://your-project.vercel.app/api/health
@@ -108,7 +125,7 @@ Login → open an event → Jelly **Brief me** → add a note.
 
 ---
 
-## 5. Limitations on Vercel
+## 6. Limitations on Vercel
 
 | Feature | Status |
 |---------|--------|
@@ -116,11 +133,11 @@ Login → open an event → Jelly **Brief me** → add a note.
 | Jelly chat (Azure OpenAI) | Works |
 | Voice recording | Needs **HTTPS** (Vercel provides this) |
 | Event / avatar **uploads** | **Ephemeral** on Vercel — files may disappear after redeploy. Re-upload images or use office/Docker for production file storage. |
-| Heavy document ingest | Works if Grok/Groq model supports it; vision quality varies by model |
+| Large Excel **photo** import | Works when `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` are set |
 
 ---
 
-## 6. Troubleshooting
+## 7. Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
@@ -129,11 +146,12 @@ Login → open an event → Jelly **Brief me** → add a note.
 | `ai: missing` | Set `GROK_API_KEY` + `AI_PROVIDER=grok` on Vercel backend env |
 | App exits on deploy | Set `ALLOWED_ORIGINS` to your exact Vercel URL |
 | Login works, no data | Run `migrate` + `seed` against Supabase URL |
-| Gray event images | Uploads not persistent on Vercel — re-upload after deploy |
+| Photo import fails on large Excel | Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`; check `/api/health` → `ingestStorage.configured` |
+| Cloud upload failed (CORS) | Supabase → Storage → Configuration → add your Vercel URL to allowed origins |
 
 ---
 
-## 7. Local test with same stack
+## 8. Local test with same stack
 
 ```powershell
 copy .env.vercel.example .env

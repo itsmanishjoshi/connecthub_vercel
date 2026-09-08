@@ -137,9 +137,6 @@ const EventPage = () => {
           const cachedAttendees = await readCachedAttendees(cachedEvent.data.id);
           if (cachedAttendees?.data) {
             setAttendees(cachedAttendees.data.map((sa) => mapAttendee(sa)));
-            setCachedAt(Math.min(cachedEvent.savedAt, cachedAttendees.savedAt));
-          } else {
-            setCachedAt(cachedEvent.savedAt);
           }
           setLoading(false);
         } else {
