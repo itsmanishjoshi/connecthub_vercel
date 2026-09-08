@@ -30,6 +30,7 @@ from app.upload_access import can_access_upload
 from app.services.ai_usage_context import reset_ai_log_context, set_ai_log_context, should_track_ai_usage
 from app.services.analytics import ensure_analytics_schema
 from app.services.asset_library import ensure_asset_library, register_asset_routes
+from app.bootstrap import bootstrap_database
 
 
 def _ensure_upload_dirs() -> None:
@@ -65,6 +66,7 @@ async def lifespan(app: FastAPI):
     if pool is not None:
         register_asset_routes(api_router, pool, settings.upload_dir)
         try:
+            await bootstrap_database(pool)
             await ensure_attendee_photo_columns(pool)
             await ensure_asset_library(pool)
             await ensure_analytics_schema(pool)

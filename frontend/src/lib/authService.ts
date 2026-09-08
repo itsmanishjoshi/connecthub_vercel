@@ -139,6 +139,15 @@ export async function signIn(username: string, password: string): Promise<{ user
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   });
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    const preview = (await response.text().catch(() => '')).slice(0, 120);
+    throw new Error(
+      preview.startsWith('A server')
+        ? 'API server error. Check Vercel backend logs and redeploy.'
+        : 'Server returned an invalid response. Open /api/health in the browser.',
+    );
+  }
   const json = await response.json().catch(() => ({}));
   if (!response.ok) {
     if (response.status >= 500) {
