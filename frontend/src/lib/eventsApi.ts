@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { readSnapshot, saveSnapshot } from './offlineStore';
+import { readSnapshot, saveSnapshot, type CachedValue } from './offlineStore';
 
 export interface ReadResult<T> {
   data: T;
@@ -10,6 +10,23 @@ export interface ReadResult<T> {
 const eventListKey = 'events:list';
 const eventSlugKey = (slug: string) => `events:slug:${slug}`;
 const attendeesKey = (eventId: string) => `attendees:event:${eventId}`;
+
+function cacheEvents(events: Event[]): void {
+  void saveSnapshot(eventListKey, events).catch(() => {});
+  void Promise.all(events.map((event) => saveSnapshot(eventSlugKey(event.slug), event))).catch(() => {});
+}
+
+export async function readCachedEvents(): Promise<CachedValue<Event[]> | null> {
+  return readSnapshot(eventListKey);
+}
+
+export async function readCachedEventBySlug(slug: string): Promise<CachedValue<Event> | null> {
+  return readSnapshot(eventSlugKey(slug));
+}
+
+export async function readCachedAttendees(eventId: string): Promise<CachedValue<Attendee[]> | null> {
+  return readSnapshot(attendeesKey(eventId));
+}
 
 export interface Event {
   id: string;
@@ -161,8 +178,7 @@ export async function fetchEventsWithSource(): Promise<ReadResult<Event[]>> {
       const dateB = new Date(b.created_at).getTime();
       return dateB - dateA; // Newest first
     });
-    await saveSnapshot(eventListKey, events);
-    await Promise.all(events.map((event) => saveSnapshot(eventSlugKey(event.slug), event)));
+    cacheEvents(events);
     return { data: events, source: 'network' };
   } catch (error) {
     console.error('Failed to fetch shared events:', error);
@@ -195,7 +211,7 @@ export async function fetchEventBySlugWithSource(slug: string): Promise<ReadResu
       throw new Error(json.error?.message || 'Event not found');
     }
     const event = json.data || null;
-    if (event) await saveSnapshot(eventSlugKey(slug), event);
+    if (event) void saveSnapshot(eventSlugKey(slug), event).catch(() => {});
     return { data: event, source: 'network' };
   } catch (error) {
     console.error('Error fetching event:', error);
@@ -299,7 +315,7 @@ export async function fetchAttendeesByEventWithSource(eventId: string): Promise<
 
     if (error) throw error;
     const attendees = data || [];
-    await saveSnapshot(attendeesKey(eventId), attendees);
+    void saveSnapshot(attendeesKey(eventId), attendees).catch(() => {});
     return { data: attendees, source: 'network' };
   } catch (error) {
     console.error('Error fetching attendees:', error);

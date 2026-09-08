@@ -16,7 +16,7 @@ import * as attendeeDataService from '@/services/attendeeDataService';
 import { getSector } from '@/utils/sectors';
 import { exportMarkedConnections } from '@/utils/export';
 import { toast } from 'sonner';
-import { fetchEventBySlugWithSource, fetchAttendeesByEvent, fetchAttendeesByEventWithSource, verifyEventPin, type Event as SupabaseEvent, type Attendee as SupabaseAttendee } from '@/lib/eventsApi';
+import { fetchEventBySlugWithSource, fetchAttendeesByEventWithSource, readCachedAttendees, readCachedEventBySlug, verifyEventPin, type Event as SupabaseEvent, type Attendee as SupabaseAttendee } from '@/lib/eventsApi';
 import { attendeeCity, attendeeIndustry, attendeePriority, parseAttendeeExtra } from '@/lib/attendeeDisplay';
 import { canEditAttendeeCards, canManageEventAccess } from '@/lib/eventAccess';
 import { splitIceBreakers, splitTalkingPoints } from '@/lib/profileNotes';
@@ -129,8 +129,22 @@ const EventPage = () => {
       }
 
       try {
-        setLoading(true);
         setError(null);
+
+        const cachedEvent = await readCachedEventBySlug(eventSlug);
+        if (cachedEvent?.data) {
+          setEvent(cachedEvent.data);
+          const cachedAttendees = await readCachedAttendees(cachedEvent.data.id);
+          if (cachedAttendees?.data) {
+            setAttendees(cachedAttendees.data.map((sa) => mapAttendee(sa)));
+            setCachedAt(Math.min(cachedEvent.savedAt, cachedAttendees.savedAt));
+          } else {
+            setCachedAt(cachedEvent.savedAt);
+          }
+          setLoading(false);
+        } else {
+          setLoading(true);
+        }
 
         const eventResult = await fetchEventBySlugWithSource(eventSlug);
         const eventData = eventResult.data;

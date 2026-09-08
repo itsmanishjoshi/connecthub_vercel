@@ -2,6 +2,7 @@ import { supabase } from './supabaseClient';
 import { resolveAvatarUrl } from './avatarUpload';
 
 const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const REQUEST_TIMEOUT_MS = 20_000;
 
 export interface User {
   id: string;
@@ -56,14 +57,22 @@ function readRememberedSession(): { user: User; profile: UserProfile | null } | 
 }
 
 async function apiRequest(path: string, init: RequestInit = {}) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   let response: Response;
   try {
     response = await fetch(`${API_BASE}${path}`, {
       ...init,
       headers: { ...authHeaders(), ...(init.headers || {}) },
+      signal: controller.signal,
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new AuthNetworkError('ConnectHub is taking too long to respond. Check that the server is running.');
+    }
     throw new AuthNetworkError();
+  } finally {
+    window.clearTimeout(timeoutId);
   }
   const json = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(json.error?.message || `Request failed (${response.status})`);

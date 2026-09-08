@@ -8,7 +8,7 @@ import { shellBackgroundClass, shellOverlayTopClass, shellOverlayBottomClass, pa
 import { UserMenu } from '@/components/UserMenu';
 import { CreateEventModal } from '@/components/CreateEventModal';
 import { EditEventModal } from '@/components/EditEventModal';
-import { fetchEventsWithSource, type Event } from '@/lib/eventsApi';
+import { fetchEventsWithSource, readCachedEvents, type Event } from '@/lib/eventsApi';
 import { canEditEvent } from '@/lib/eventAccess';
 import { useAuth } from '@/context/SimpleAuthContext';
 import { OfficeWindows, officeWindowTitle, OFFICE_WINDOWS, pathForWindow, windowFromPath, type OfficeWindowId } from '@/components/OfficeWindows';
@@ -180,9 +180,18 @@ const Landing = () => {
   }, [officeWindow]);
 
   const loadEvents = async () => {
-    try {
+    setLoadError(null);
+
+    const cached = await readCachedEvents();
+    if (cached?.data?.length) {
+      setEvents(cached.data);
+      setCachedAt(cached.savedAt);
+      setLoading(false);
+    } else {
       setLoading(true);
-      setLoadError(null);
+    }
+
+    try {
       const result = await fetchEventsWithSource();
       const data = result.data;
       setCachedAt(result.source === 'cache' ? result.cachedAt || Date.now() : null);

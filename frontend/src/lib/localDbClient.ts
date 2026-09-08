@@ -1,4 +1,5 @@
 const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const REQUEST_TIMEOUT_MS = 20_000;
 
 type Filter = { op: 'eq' | 'neq' | 'is' | 'in'; column: string; value: unknown };
 
@@ -10,11 +11,14 @@ function authHeaders(): HeadersInit {
 }
 
 async function request(body: Record<string, unknown>) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     const response = await fetch(`${API_BASE}/api/db`, {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
     const json = await response.json().catch(() => ({ data: null, error: { message: 'Invalid API response' } }));
     if (response.status === 401) {
@@ -34,8 +38,17 @@ async function request(body: Record<string, unknown>) {
       json.error = { message: `API error ${response.status}` };
     }
     return json;
-  } catch {
-    return { data: null, error: { message: 'Network unavailable', code: 'NETWORK' } };
+  } catch (error) {
+    const timedOut = error instanceof DOMException && error.name === 'AbortError';
+    return {
+      data: null,
+      error: {
+        message: timedOut ? 'Request timed out. Check that the ConnectHub server is running.' : 'Network unavailable',
+        code: timedOut ? 'TIMEOUT' : 'NETWORK',
+      },
+    };
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 }
 

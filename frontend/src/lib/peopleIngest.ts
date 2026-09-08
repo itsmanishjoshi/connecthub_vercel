@@ -69,35 +69,42 @@ async function previewIngestedPeople(eventId: string, people: IngestedPerson[]) 
   return (await response.json()) as { people: IngestedPerson[]; warnings: string[] };
 }
 
+async function parseSpreadsheetsLocally(eventId: string, uploadFiles: File[]) {
+  const localPeople: IngestedPerson[] = [];
+  for (const file of uploadFiles) {
+    localPeople.push(...(await parseSpreadsheetFile(file)));
+  }
+  if (!localPeople.length) {
+    throw new Error('No people were found in that spreadsheet. Check column headers (Name, Company, Title).');
+  }
+  const largest = Math.max(...uploadFiles.map((file) => file.size));
+  const preview = await previewIngestedPeople(eventId, localPeople);
+  const warnings = [...(preview.warnings || [])];
+  if (largest > CLOUD_UPLOAD_LIMIT_BYTES) {
+    warnings.unshift(
+      `${uploadFiles.map((file) => file.name).join(', ')} (${formatFileSize(largest)}) was read in your browser to avoid cloud upload limits. Save the roster, then use Import photos from Excel for embedded photos.`,
+    );
+  } else {
+    warnings.unshift('Roster parsed locally from Excel/CSV.');
+  }
+  return { people: preview.people, warnings };
+}
+
 export async function extractPeopleFromSources(eventId: string, { text, files }: { text?: string; files?: File[] }) {
   const uploadFiles = files || [];
 
   if (shouldParseSpreadsheetLocally(uploadFiles) && !text?.trim()) {
-    const localPeople: IngestedPerson[] = [];
-    for (const file of uploadFiles) {
-      localPeople.push(...(await parseSpreadsheetFile(file)));
-    }
-    if (!localPeople.length) {
-      throw new Error('No people were found in that spreadsheet. Check column headers (Name, Company, Title).');
-    }
-    const largest = Math.max(...uploadFiles.map((file) => file.size));
-    const preview = await previewIngestedPeople(eventId, localPeople);
-    const warnings = [...(preview.warnings || [])];
-    if (largest > CLOUD_UPLOAD_LIMIT_BYTES) {
-      warnings.unshift(
-        `${uploadFiles.map((file) => file.name).join(', ')} (${formatFileSize(largest)}) was read in your browser to avoid cloud upload limits. Save the roster, then use Import photos from Excel for embedded photos.`,
-      );
-    } else {
-      warnings.unshift('Roster parsed locally from Excel/CSV.');
-    }
-    return { people: preview.people, warnings };
+    return parseSpreadsheetsLocally(eventId, uploadFiles);
   }
 
   const tooLarge = uploadFiles.find((file) => file.size > CLOUD_UPLOAD_LIMIT_BYTES);
   if (tooLarge) {
+    if (shouldParseSpreadsheetLocally(uploadFiles)) {
+      return parseSpreadsheetsLocally(eventId, uploadFiles);
+    }
     throw new Error(
       `"${tooLarge.name}" is too large for cloud import (${formatFileSize(tooLarge.size)}). ` +
-        'Upload Excel/CSV only — roster data will be read in your browser. For embedded photos, save first then use Import photos from Excel.',
+        'Use a smaller file, or save roster data as CSV.',
     );
   }
 

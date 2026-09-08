@@ -1,4 +1,4 @@
-import readXlsxFile from 'read-excel-file/browser';
+import readXlsxFile, { type Sheet } from 'read-excel-file/browser';
 
 export type ParsedPerson = {
   name: string;
@@ -19,16 +19,41 @@ export type ParsedPerson = {
 };
 
 const HEADER_ALIASES: Record<string, string[]> = {
-  name: ['name', 'fullname', 'attendee', 'speakername', 'person', 'attendeename', 'speakers', 'candidate', 'participant'],
+  name: [
+    'name',
+    'fullname',
+    'attendee',
+    'speakername',
+    'person',
+    'attendeename',
+    'speakers',
+    'candidate',
+    'participant',
+    'decisionmakers',
+    'decisionmaker',
+  ],
   designation: ['designation', 'title', 'role', 'jobtitle', 'position'],
   company: ['company', 'organization', 'organisation', 'org', 'firm', 'employer'],
-  industry: ['industry', 'sector', 'primaryindustry', 'subindustry'],
-  city: ['city', 'contactcity', 'officecity', 'basecity', 'hqcity', 'location', 'place', 'office', 'region'],
-  linkedin_url: ['linkedin', 'linkedinurl', 'linkedinprofile'],
-  profile_pic_url: ['profilepic', 'profilepicture', 'photo', 'picture', 'image', 'avatar', 'photourl'],
+  industry: ['industry', 'sector', 'primaryindustry', 'primarysubindustry', 'subindustry'],
+  city: ['city', 'contactcity', 'officecity', 'basecity', 'hqcity', 'homecity', 'workcity', 'employeecity'],
+  location: [
+    'location',
+    'place',
+    'office',
+    'officelocation',
+    'baselocation',
+    'region',
+    'geography',
+    'geo',
+    'hq',
+    'headquarters',
+    'countryregion',
+  ],
+  linkedin_url: ['linkedin', 'linkedinurl', 'linkedinprofile', 'linkedinid'],
+  profile_pic_url: ['profilepic', 'profilepicture', 'photo', 'picture', 'image', 'avatar', 'photourl', 'imageurl'],
   website_url: ['website', 'websiteurl', 'url', 'web'],
   key_insights: ['keyinsights', 'insights', 'notes', 'bio', 'about'],
-  ice_breakers: ['icebreakers', 'icebreaker', 'talkingpoints'],
+  ice_breakers: ['icebreakers', 'icebreaker', 'talkingpoints', 'talkingpoint'],
   speaker: ['speaker', 'isspeaker'],
   competitor: ['competitor'],
   first: ['firstname', 'first', 'givenname'],
@@ -138,12 +163,34 @@ async function parseCsvFile(file: File): Promise<ParsedPerson[]> {
   return peopleFromRows(rows);
 }
 
+function isSheetWorkbook(value: unknown): value is Sheet[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    typeof value[0] === 'object' &&
+    value[0] !== null &&
+    'data' in value[0]
+  );
+}
+
+async function parseXlsxFile(file: File): Promise<ParsedPerson[]> {
+  const workbook = await readXlsxFile(file);
+  if (isSheetWorkbook(workbook)) {
+    let best: ParsedPerson[] = [];
+    for (const sheet of workbook) {
+      const people = peopleFromRows(sheet.data ?? []);
+      if (people.length > best.length) best = people;
+    }
+    return best;
+  }
+  return peopleFromRows(workbook as unknown[][]);
+}
+
 export async function parseSpreadsheetFile(file: File): Promise<ParsedPerson[]> {
   if (/\.csv$/i.test(file.name)) {
     return parseCsvFile(file);
   }
-  const rows = await readXlsxFile(file);
-  return peopleFromRows(rows);
+  return parseXlsxFile(file);
 }
 
 export function formatFileSize(bytes: number): string {
@@ -153,7 +200,15 @@ export function formatFileSize(bytes: number): string {
 
 export const CLOUD_UPLOAD_LIMIT_BYTES = 4 * 1024 * 1024;
 
+const SPREADSHEET_EXTENSION = /\.(xlsx|xls|csv|ods)$/i;
+const SPREADSHEET_MIME =
+  /^(text\/csv|application\/vnd\.(ms-excel|openxmlformats-officedocument\.spreadsheetml\.sheet)|application\/vnd\.oasis\.opendocument\.spreadsheet)/i;
+
+export function isSpreadsheetFile(file: File): boolean {
+  return SPREADSHEET_EXTENSION.test(file.name) || SPREADSHEET_MIME.test(file.type || '');
+}
+
 export function shouldParseSpreadsheetLocally(files: File[]): boolean {
   if (!files.length) return false;
-  return files.every((file) => /\.(xlsx|xls|csv|ods)$/i.test(file.name));
+  return files.every(isSpreadsheetFile);
 }
