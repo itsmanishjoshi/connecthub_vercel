@@ -1,3 +1,10 @@
+import {
+  CLOUD_UPLOAD_LIMIT_BYTES,
+  formatFileSize,
+  parseSpreadsheetFile,
+  shouldParseSpreadsheetLocally,
+} from './spreadsheetIngest';
+
 export interface IngestedPerson {
   name: string;
   designation?: string | null;
@@ -36,10 +43,10 @@ async function readApiError(response: Response, fallback: string): Promise<strin
   if (!contentType.includes('application/json')) {
     const preview = (await response.text().catch(() => '')).slice(0, 160);
     if (preview.startsWith('A server') || preview.startsWith('Internal Server')) {
-      return 'API server error. The file may be too large for cloud hosting (try CSV under 4 MB).';
+      return 'API server error. Try reading the roster in your browser (Excel/CSV) or use a smaller file.';
     }
     if (response.status === 413) {
-      return 'File is too large for cloud import (max about 4 MB). Save as CSV or remove embedded photos.';
+      return 'File is too large to upload. Roster data is read in your browser for large Excel files; use Import photos separately.';
     }
     return preview || `${fallback} (HTTP ${response.status})`;
   }
@@ -47,22 +54,56 @@ async function readApiError(response: Response, fallback: string): Promise<strin
   return json.error?.message || json.message || fallback;
 }
 
-const MAX_CLOUD_UPLOAD_BYTES = 4 * 1024 * 1024;
-
-function assertUploadSize(files: File[] | undefined) {
-  const tooLarge = (files || []).find((file) => file.size > MAX_CLOUD_UPLOAD_BYTES);
-  if (!tooLarge) return;
-  throw new Error(
-    `"${tooLarge.name}" is too large for cloud import (${Math.ceil(tooLarge.size / (1024 * 1024))} MB). ` +
-      'Use CSV under 4 MB, or remove embedded photos and import photos separately.',
-  );
+async function previewIngestedPeople(eventId: string, people: IngestedPerson[]) {
+  const response = await fetch(`${apiBase()}/api/events/${eventId}/people/preview`, {
+    method: 'POST',
+    headers: {
+      ...authHeaders(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ people }),
+  });
+  if (!response.ok) {
+    throw new Error(await readApiError(response, 'Could not prepare roster for import'));
+  }
+  return (await response.json()) as { people: IngestedPerson[]; warnings: string[] };
 }
 
 export async function extractPeopleFromSources(eventId: string, { text, files }: { text?: string; files?: File[] }) {
-  assertUploadSize(files);
+  const uploadFiles = files || [];
+
+  if (shouldParseSpreadsheetLocally(uploadFiles) && !text?.trim()) {
+    const localPeople: IngestedPerson[] = [];
+    for (const file of uploadFiles) {
+      localPeople.push(...(await parseSpreadsheetFile(file)));
+    }
+    if (!localPeople.length) {
+      throw new Error('No people were found in that spreadsheet. Check column headers (Name, Company, Title).');
+    }
+    const largest = Math.max(...uploadFiles.map((file) => file.size));
+    const preview = await previewIngestedPeople(eventId, localPeople);
+    const warnings = [...(preview.warnings || [])];
+    if (largest > CLOUD_UPLOAD_LIMIT_BYTES) {
+      warnings.unshift(
+        `${uploadFiles.map((file) => file.name).join(', ')} (${formatFileSize(largest)}) was read in your browser to avoid cloud upload limits. Save the roster, then use Import photos from Excel for embedded photos.`,
+      );
+    } else {
+      warnings.unshift('Roster parsed locally from Excel/CSV.');
+    }
+    return { people: preview.people, warnings };
+  }
+
+  const tooLarge = uploadFiles.find((file) => file.size > CLOUD_UPLOAD_LIMIT_BYTES);
+  if (tooLarge) {
+    throw new Error(
+      `"${tooLarge.name}" is too large for cloud import (${formatFileSize(tooLarge.size)}). ` +
+        'Upload Excel/CSV only — roster data will be read in your browser. For embedded photos, save first then use Import photos from Excel.',
+    );
+  }
+
   const body = new FormData();
   if (text?.trim()) body.append('text', text.trim());
-  (files || []).forEach((file) => body.append('files', file));
+  uploadFiles.forEach((file) => body.append('files', file));
   const response = await fetch(`${apiBase()}/api/events/${eventId}/people/extract`, {
     method: 'POST',
     headers: authHeaders(),
@@ -96,7 +137,12 @@ export async function commitIngestedPeople(eventId: string, people: IngestedPers
 }
 
 export async function importPhotosFromSpreadsheet(eventId: string, file?: File) {
-  if (file) assertUploadSize([file]);
+  if (file && file.size > CLOUD_UPLOAD_LIMIT_BYTES) {
+    throw new Error(
+      `"${file.name}" is too large for photo import (${formatFileSize(file.size)}). ` +
+        'Remove embedded images from the Excel file and re-add photos from each person card, or run photo import from a local/office server.',
+    );
+  }
   const body = new FormData();
   if (file) body.append('file', file);
   const response = await fetch(`${apiBase()}/api/events/${eventId}/people/import-photos`, {

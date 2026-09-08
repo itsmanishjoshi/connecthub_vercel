@@ -262,6 +262,38 @@ def _max_upload_bytes() -> int:
     return 32 * 1024 * 1024
 
 
+@router.post("/api/events/{event_id}/people/preview")
+async def people_preview(
+    event_id: str,
+    request: Request,
+    pool: asyncpg.Pool = Depends(get_pool),
+):
+    user = await authenticate(request, pool)
+    require_admin(user)
+    await require_event_role(pool, user, event_id, "edit")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    people = body.get("people") if isinstance(body.get("people"), list) else []
+    if not people:
+        raise api_error(400, "No people to preview")
+    existing = await pool.fetch(
+        """SELECT id, name, company, designation, industry, location, city, linkedin_url, website_url,
+                  key_insights, ice_breakers, event_association, speaker, competitor, extra_data
+             FROM attendees WHERE event_id = $1""",
+        event_id,
+    )
+    finalized = finalize_import_people(
+        people,
+        [{**dict(row), "extra_data": coerce_extra_data(row["extra_data"])} for row in existing],
+    )
+    return {
+        "people": finalized,
+        "warnings": ["Roster rows prepared for review."],
+    }
+
+
 @router.post("/api/events/{event_id}/people/extract")
 async def people_extract(
     event_id: str,

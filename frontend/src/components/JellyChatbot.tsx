@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Check, History, Loader2, MessageSquare, Mic, Paperclip, Plus, Send, SquarePen, Trash2, X } from 'lucide-react';
 import { fetchAttendeesByEvent, fetchEvents } from '@/lib/eventsApi';
+import { apiBase } from '@/lib/api/http';
 import { chatWithConnectHub } from '@/services/aiService';
 import { analyzeQuery, executeAction, undoAction, type AIAction } from '@/services/smartAIService';
 import { ConversationIntelligencePanel } from '@/components/ConversationIntelligencePanel';
@@ -223,9 +224,15 @@ export function JellyChatbot({ open, onClose }: JellyChatbotProps) {
     setActiveSessionId(session.id);
     setMessages(session.messages);
     setHistoryOpen(false);
-    fetch(`${(import.meta.env.VITE_API_URL || '').replace(/\/$/, '')}/api/health`)
-      .then((response) => response.json().catch(() => ({})))
-      .then((health) => setAiConfigured(health.ai === 'configured'))
+    fetch(`${apiBase()}/api/health`)
+      .then(async (response) => {
+        if (!response.ok) {
+          setAiConfigured(null);
+          return;
+        }
+        const health = await response.json().catch(() => ({}));
+        setAiConfigured(typeof health.ai === 'string' ? health.ai === 'configured' : null);
+      })
       .catch(() => setAiConfigured(null));
     setTimeout(() => inputRef.current?.focus(), 80);
   }, [open]);
@@ -540,8 +547,10 @@ export function JellyChatbot({ open, onClose }: JellyChatbotProps) {
         id: String(Date.now() + 1),
         role: 'assistant',
         content: aiConfigured === false
-          ? 'Chat needs an AI key on this server. Voice capture still works without it.'
-          : 'I couldn’t complete that just now. Try again in a moment.',
+          ? 'Chat needs Azure OpenAI on the server. In Vercel, set AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT in project environment variables, then redeploy.'
+          : aiConfigured === null
+            ? 'Could not reach the ConnectHub API. Check that the backend service is deployed on Vercel and the database is connected.'
+            : 'I couldn’t complete that just now. Try again in a moment.',
       }]);
     } finally {
       setLoading(false);
