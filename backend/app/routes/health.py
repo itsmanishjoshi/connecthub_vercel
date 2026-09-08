@@ -12,6 +12,29 @@ from app.services.ai_router import configured_providers, describe_ai_routing, is
 router = APIRouter()
 
 
+def _database_hint(error: Exception) -> str:
+    if isinstance(error, asyncpg.PostgresError):
+        code = getattr(error, "sqlstate", "") or ""
+        message = str(error).lower()
+        if code == "28P01" or "password authentication failed" in message:
+            return "PostgreSQL rejected the password in DATABASE_URL."
+        if "connection refused" in message or code in ("08001",):
+            return "PostgreSQL is not reachable on DATABASE_URL."
+        if "prepared statement" in message or code in ("26000", "08P01"):
+            return (
+                "Supabase pooler connection failed. Use the Session pooler URI "
+                "(port 6543) with ?sslmode=require in Vercel DATABASE_URL."
+            )
+        if code == "42P01":
+            return "Database tables missing. Run exports/connecthub-schema-only.sql in Supabase SQL Editor."
+    if isinstance(error, OSError):
+        return "PostgreSQL is not reachable on DATABASE_URL."
+    detail = str(error).strip()
+    if detail:
+        return f"The API cannot query PostgreSQL. ({detail})"
+    return "The API cannot query PostgreSQL."
+
+
 @router.get("/api/health")
 async def health():
     ai_status = "configured" if is_ai_configured() else "missing"
@@ -30,19 +53,13 @@ async def health():
         result["database"] = "ok"
         return result
     except asyncpg.PostgresError as error:
-        code = getattr(error, "sqlstate", "")
-        if code == "28P01":
-            result["databaseHint"] = "PostgreSQL rejected the password in DATABASE_URL."
-        elif "connection refused" in str(error).lower() or code in ("08001", "ECONNREFUSED"):
-            result["databaseHint"] = "PostgreSQL is not reachable on DATABASE_URL."
-        else:
-            result["databaseHint"] = "The API cannot query PostgreSQL."
+        result["databaseHint"] = _database_hint(error)
         return JSONResponse(status_code=503, content=result)
-    except OSError:
-        result["databaseHint"] = "PostgreSQL is not reachable on DATABASE_URL."
+    except OSError as error:
+        result["databaseHint"] = _database_hint(error)
         return JSONResponse(status_code=503, content=result)
     except Exception as error:
-        result["databaseHint"] = str(error) or "Database connection failed."
+        result["databaseHint"] = _database_hint(error)
         return JSONResponse(status_code=503, content=result)
 
 

@@ -3,12 +3,36 @@ from __future__ import annotations
 import os
 import ssl
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 import asyncpg
 
 from app.config import settings
 
 _pool: asyncpg.Pool | None = None
+
+
+def _uses_pg_pooler(database_url: str) -> bool:
+    parsed = urlparse(database_url.replace("postgresql://", "https://", 1))
+    host = (parsed.hostname or "").lower()
+    port = parsed.port or 5432
+    query = parse_qs(parsed.query)
+    if "pooler" in host or "supabase" in host or port == 6543:
+        return True
+    pgbouncer = (query.get("pgbouncer") or [""])[0].lower()
+    return pgbouncer in ("true", "1")
+
+
+def _pool_connect_kwargs() -> dict[str, Any]:
+    serverless = bool(os.getenv("VERCEL") or os.getenv("VERCEL_URL"))
+    kwargs: dict[str, Any] = {
+        "min_size": 0 if serverless else 1,
+        "max_size": 1 if serverless else 20,
+        "command_timeout": 60,
+    }
+    if serverless or _uses_pg_pooler(settings.database_url):
+        kwargs["statement_cache_size"] = 0
+    return kwargs
 
 
 def _ssl_context() -> ssl.SSLContext | None:
@@ -27,13 +51,10 @@ async def init_pool() -> asyncpg.Pool:
     if _pool is not None:
         return _pool
     ssl_ctx = _ssl_context()
-    serverless = bool(os.getenv("VERCEL") or os.getenv("VERCEL_URL"))
     _pool = await asyncpg.create_pool(
         settings.database_url,
         ssl=ssl_ctx if ssl_ctx else False,
-        min_size=0 if serverless else 1,
-        max_size=1 if serverless else 20,
-        command_timeout=60,
+        **_pool_connect_kwargs(),
     )
     return _pool
 
