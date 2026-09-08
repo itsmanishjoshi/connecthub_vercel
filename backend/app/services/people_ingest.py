@@ -895,7 +895,7 @@ async def extract_people(
     if should_run_ai:
         if not is_ai_configured():
             if not direct_people and not notes_people:
-                err = Exception("AI is not configured. Set GROQ_API_KEY, OPENROUTER_API_KEY, GEMINI_API_KEY, MISTRAL_API_KEY, or GROK_API_KEY, or upload an Excel/CSV roster.")
+                err = Exception("AI is not configured. Set AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT, or upload an Excel/CSV roster.")
                 err.status = 501  # type: ignore[attr-defined]
                 raise err
             warnings.append("Notes were not read because AI is not configured. Roster rows from Excel were kept.")

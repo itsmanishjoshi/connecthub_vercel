@@ -245,7 +245,7 @@ def merge_detected_tools(rows: list[dict], user_id: str, conversation_id: str, m
 
 async def analyze_conversation(*, conversation: dict, segments: list[dict], log: dict | None = None) -> dict:
     if not is_ai_configured():
-        err = Exception("AI is not configured. Set GROQ_API_KEY, OPENROUTER_API_KEY, GEMINI_API_KEY, MISTRAL_API_KEY, or GROK_API_KEY on the server.")
+        err = Exception("AI is not configured. Set AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT on the server.")
         err.status = 501  # type: ignore[attr-defined]
         raise err
     if not segments:

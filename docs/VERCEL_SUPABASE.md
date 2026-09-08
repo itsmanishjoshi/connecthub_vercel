@@ -8,7 +8,7 @@ Use this when the office server is VPN-only and you need access from anywhere.
 |-------|---------|
 | UI + API routing | **Vercel** (one project, two services) |
 | Database | **Supabase Postgres** (`DATABASE_URL` only) |
-| AI (Jelly) | **xAI Grok** (`GROK_API_KEY`) or **Groq** (`GROQ_API_KEY`) |
+| AI (Jelly) | **Azure OpenAI** (`AZURE_OPENAI_*`) |
 
 The browser still talks to `/api` on your Vercel domain. Supabase is **Postgres only** — the app does not use Supabase Auth or Supabase Storage SDKs.
 
@@ -34,27 +34,25 @@ python scripts/migrate.py seed
 
 ---
 
-## 2. Grok API key
+## 2. Azure OpenAI
 
-1. Sign up at [console.x.ai](https://console.x.ai).
-2. Create an API key.
-3. In Vercel env:
-
-```env
-AI_PROVIDER=grok
-GROK_API_KEY=your-xai-key
-GROK_MODEL=grok-2-1212
-```
-
-**Groq alternative** (faster/cheaper for chat):
+1. In [Azure Portal](https://portal.azure.com), open your Azure OpenAI resource.
+2. Copy the **endpoint** and **API key** from Keys and Endpoint.
+3. Confirm deployment names (e.g. `gpt-4o`).
+4. In Vercel env:
 
 ```env
-AI_PROVIDER=groq
-GROQ_API_KEY=your-groq-key
-GROQ_MODEL=llama-3.3-70b-versatile
+AI_PROVIDER=azure
+AZURE_OPENAI_API_KEY=your-azure-key
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+AZURE_OPENAI_API_VERSION=2025-01-01-preview
+AZURE_OPENAI_DEPLOYMENT=gpt-4o
+AZURE_OPENAI_LITE_DEPLOYMENT=gpt-4o
+AZURE_OPENAI_EXTRACT_DEPLOYMENT=gpt-4o
+AZURE_OPENAI_VISION_DEPLOYMENT=gpt-4o
 ```
 
-Provider auto-order if `AI_PROVIDER` is empty: **Groq → OpenRouter → Gemini → Mistral → Grok** (first with keys wins).
+Remove any old `GROQ_*`, `GROK_*`, `OPENROUTER_*`, `GEMINI_*`, or `MISTRAL_*` variables from Vercel.
 
 ---
 
@@ -74,9 +72,11 @@ Provider auto-order if `AI_PROVIDER` is empty: **Groq → OpenRouter → Gemini 
 | `ADMIN_EMAIL` | Yes | |
 | `NODE_ENV` | Yes | `production` |
 | `ALLOWED_ORIGINS` | Yes | `https://your-project.vercel.app` |
-| `AI_PROVIDER` | Yes | `grok` or `groq` |
-| `GROK_API_KEY` | If using Grok | |
-| `GROQ_API_KEY` | If using Groq | |
+| `AI_PROVIDER` | Yes | `azure` |
+| `AZURE_OPENAI_API_KEY` | Yes | From Azure Portal |
+| `AZURE_OPENAI_ENDPOINT` | Yes | e.g. `https://your-resource.openai.azure.com` |
+| `AZURE_OPENAI_API_VERSION` | Yes | e.g. `2025-01-01-preview` |
+| `AZURE_OPENAI_DEPLOYMENT` | Yes | e.g. `gpt-4o` |
 | `UPLOAD_DIR` | Recommended | `/tmp/connecthub-uploads` on Vercel |
 
 **Do not** set `VITE_API_URL` — leave empty so the UI uses same-origin `/api`.
@@ -100,7 +100,7 @@ Expect:
   "application": "ok",
   "database": "ok",
   "ai": "configured",
-  "aiProviders": ["grok"]
+  "aiProviders": ["azure"]
 }
 ```
 
@@ -113,7 +113,7 @@ Login → open an event → Jelly **Brief me** → add a note.
 | Feature | Status |
 |---------|--------|
 | Login, events, attendees, notes | Works with Supabase |
-| Jelly chat (Grok/Groq) | Works |
+| Jelly chat (Azure OpenAI) | Works |
 | Voice recording | Needs **HTTPS** (Vercel provides this) |
 | Event / avatar **uploads** | **Ephemeral** on Vercel — files may disappear after redeploy. Re-upload images or use office/Docker for production file storage. |
 | Heavy document ingest | Works if Grok/Groq model supports it; vision quality varies by model |

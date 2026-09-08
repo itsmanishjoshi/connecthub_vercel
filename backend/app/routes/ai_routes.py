@@ -17,7 +17,7 @@ router = APIRouter()
 async def ai_chat(request: Request, pool: asyncpg.Pool = Depends(get_pool)):
     user = await authenticate(request, pool)
     if not is_ai_configured():
-        raise api_error(501, "AI is not configured. Set GROQ_API_KEY, OPENROUTER_API_KEY, GEMINI_API_KEY, MISTRAL_API_KEY, or GROK_API_KEY on the server.")
+        raise api_error(501, "AI is not configured. Set AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT on the server.")
     try:
         body = await request.json()
     except Exception:
@@ -52,7 +52,7 @@ async def ai_chat(request: Request, pool: asyncpg.Pool = Depends(get_pool)):
 async def jelly_chat_route(request: Request, pool: asyncpg.Pool = Depends(get_pool)):
     user = await authenticate(request, pool)
     if not is_ai_configured():
-        raise api_error(501, "AI is not configured. Set GROQ_API_KEY, OPENROUTER_API_KEY, GEMINI_API_KEY, MISTRAL_API_KEY, or GROK_API_KEY on the server.")
+        raise api_error(501, "AI is not configured. Set AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT on the server.")
     try:
         body = await request.json()
     except Exception:
