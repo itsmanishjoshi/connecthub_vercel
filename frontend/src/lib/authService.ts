@@ -143,7 +143,8 @@ export async function signIn(username: string, password: string): Promise<{ user
   if (!response.ok) {
     if (response.status >= 500) {
       try {
-        const health = await fetch(`${API_BASE}/api/health`).then((r) => r.json());
+        const healthResponse = await fetch(`${API_BASE}/api/health`);
+        const health = await healthResponse.json().catch(() => ({}));
         if (health.database !== 'ok' && health.databaseHint) {
           throw new Error(health.databaseHint);
         }

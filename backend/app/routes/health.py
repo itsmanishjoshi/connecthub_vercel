@@ -15,22 +15,10 @@ router = APIRouter()
 @router.get("/api/health")
 async def health():
     ai_status = "configured" if is_ai_configured() else "missing"
-    if settings.is_production:
-        try:
-            pool = await get_pool()
-            await pool.fetchval("SELECT 1")
-            payload: dict = {"ok": True, "ai": ai_status}
-            if is_ai_configured():
-                payload["aiProviders"] = configured_providers()
-                payload["aiRouting"] = describe_ai_routing()
-            return payload
-        except Exception:
-            return JSONResponse(status_code=503, content={"ok": False, "ai": ai_status})
-
     result = {
         "application": "ok",
         "database": "error",
-        "storage": "ok" if settings.upload_dir.exists() else "error",
+        "storage": "ok",
         "ai": ai_status,
     }
     if is_ai_configured():
@@ -52,6 +40,9 @@ async def health():
         return JSONResponse(status_code=503, content=result)
     except OSError:
         result["databaseHint"] = "PostgreSQL is not reachable on DATABASE_URL."
+        return JSONResponse(status_code=503, content=result)
+    except Exception as error:
+        result["databaseHint"] = str(error) or "Database connection failed."
         return JSONResponse(status_code=503, content=result)
 
 

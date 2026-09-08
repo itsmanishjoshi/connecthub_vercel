@@ -32,6 +32,14 @@ from app.services.analytics import ensure_analytics_schema
 from app.services.asset_library import ensure_asset_library, register_asset_routes
 
 
+def _ensure_upload_dirs() -> None:
+    for path in (settings.upload_dir, settings.private_upload_dir, settings.ingest_upload_dir):
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+        except OSError as error:
+            print(f"Could not create upload dir {path}: {error}", file=sys.stderr)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if settings.is_production and settings.insecure_auth_secret:
@@ -41,34 +49,38 @@ async def lifespan(app: FastAPI):
         print("Office serving requires a strong AUTH_SECRET in backend/.env", file=sys.stderr)
         raise SystemExit(1)
     if settings.is_production and not settings.allowed_origins:
-        print("Production requires ALLOWED_ORIGINS in backend/.env", file=sys.stderr)
+        print("Production requires ALLOWED_ORIGINS (or deploy on Vercel with VERCEL_URL).", file=sys.stderr)
         raise SystemExit(1)
     if settings.insecure_auth_secret:
         print("AUTH_SECRET is not set; using a development default. Set AUTH_SECRET for office use.")
 
-    settings.upload_dir.mkdir(parents=True, exist_ok=True)
-    settings.ingest_upload_dir.mkdir(parents=True, exist_ok=True)
+    _ensure_upload_dirs()
 
-    pool = await init_pool()
-    register_asset_routes(api_router, pool, settings.upload_dir)
-    if not getattr(app.state, "api_router_mounted", False):
-        app.include_router(api_router)
-        app.state.api_router_mounted = True
+    pool = None
+    try:
+        pool = await init_pool()
+    except Exception as error:
+        print(f"Database pool init failed: {error}", file=sys.stderr)
+
+    if pool is not None:
+        register_asset_routes(api_router, pool, settings.upload_dir)
+        try:
+            await ensure_attendee_photo_columns(pool)
+            await ensure_asset_library(pool)
+            await ensure_analytics_schema(pool)
+        except Exception as error:
+            print(f"Could not prepare database columns: {error}", file=sys.stderr)
+
     if settings.serve_static and not getattr(app.state, "spa_mounted", False):
         _mount_spa_routes(app)
         app.state.spa_mounted = True
-    try:
-        await ensure_attendee_photo_columns(pool)
-        await ensure_asset_library(pool)
-        await ensure_analytics_schema(pool)
-    except Exception as error:
-        print(f"Could not prepare database columns: {error}")
 
     yield
     await close_pool()
 
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(api_router)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
@@ -167,10 +179,11 @@ async def uploads_guard_middleware(request: Request, call_next):
     return await call_next(request)
 
 
-settings.upload_dir.mkdir(parents=True, exist_ok=True)
-settings.ingest_upload_dir.mkdir(parents=True, exist_ok=True)
-
-app.mount("/uploads", StaticFiles(directory=str(settings.upload_dir)), name="uploads")
+_ensure_upload_dirs()
+try:
+    app.mount("/uploads", StaticFiles(directory=str(settings.upload_dir)), name="uploads")
+except RuntimeError as error:
+    print(f"Uploads mount skipped: {error}", file=sys.stderr)
 
 
 def _mount_spa_routes(app: FastAPI) -> None:

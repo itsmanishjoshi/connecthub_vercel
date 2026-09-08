@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import ssl
 from typing import Any
 
@@ -26,11 +27,12 @@ async def init_pool() -> asyncpg.Pool:
     if _pool is not None:
         return _pool
     ssl_ctx = _ssl_context()
+    serverless = bool(os.getenv("VERCEL") or os.getenv("VERCEL_URL"))
     _pool = await asyncpg.create_pool(
         settings.database_url,
         ssl=ssl_ctx if ssl_ctx else False,
-        min_size=1,
-        max_size=20,
+        min_size=0 if serverless else 1,
+        max_size=1 if serverless else 20,
         command_timeout=60,
     )
     return _pool

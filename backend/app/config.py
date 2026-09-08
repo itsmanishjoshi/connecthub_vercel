@@ -38,6 +38,31 @@ def _env(name: str, default: str | None = None) -> str | None:
     return os.environ.get(name, default)
 
 
+def _is_vercel_runtime() -> bool:
+    return bool(_env("VERCEL") or _env("VERCEL_URL"))
+
+
+def _resolve_upload_dir() -> Path:
+    explicit = (_env("UPLOAD_DIR") or "").strip()
+    if explicit:
+        return Path(explicit)
+    if _is_vercel_runtime():
+        return Path("/tmp/connecthub-uploads")
+    return BACKEND_ROOT / "uploads"
+
+
+def _resolve_allowed_origins() -> list[str]:
+    origins = [o.strip() for o in (_env("ALLOWED_ORIGINS") or "").split(",") if o.strip()]
+    for key in ("VERCEL_URL", "VERCEL_BRANCH_URL"):
+        host = (_env(key) or "").strip()
+        if not host:
+            continue
+        origin = host if host.startswith("http") else f"https://{host}"
+        if origin not in origins:
+            origins.append(origin)
+    return origins
+
+
 class Settings:
     database_url: str = (
         _env("DATABASE_URL")
@@ -45,11 +70,9 @@ class Settings:
         or "postgresql://connecthub_user:connecthub_office_local@localhost:5432/connecthub"
     )
     auth_secret: str = _env("AUTH_SECRET") or "connecthub-dev-only-change-me"
-    upload_dir: Path = Path(_env("UPLOAD_DIR") or str(BACKEND_ROOT / "uploads"))
-    node_env: str = _env("NODE_ENV") or "development"
-    allowed_origins: list[str] = [
-        o.strip() for o in (_env("ALLOWED_ORIGINS") or "").split(",") if o.strip()
-    ]
+    upload_dir: Path = _resolve_upload_dir()
+    node_env: str = _env("NODE_ENV") or ("production" if _is_vercel_runtime() else "development")
+    allowed_origins: list[str] = _resolve_allowed_origins()
     serve_static: bool = (
         _env("SERVE_STATIC") == "1"
         or bool(_env("WEBSITE_SITE_NAME"))
