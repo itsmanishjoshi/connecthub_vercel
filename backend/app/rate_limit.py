@@ -7,6 +7,8 @@ from slowapi.util import get_remote_address
 
 
 class _NoopLimiter:
+    enabled = False
+
     def limit(self, *_args, **_kwargs):
         def decorator(func):
             return func
