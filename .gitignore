@@ -1,0 +1,71 @@
+# Dependencies
+node_modules/
+**/.venv/
+**/venv/
+
+# Build outputs
+dist/
+build/
+frontend/dist/
+
+# Environment and secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production
+.env.production.local
+*.pem
+*.key
+*.p12
+*.pfx
+
+# IDE and editor
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Coverage
+coverage/
+
+# Temporary
+tmp/
+temp/
+docs/.sast-temp/
+
+# Local database and uploads (never commit)
+**/.pgdata/
+.pgdata/
+frontend/.pgdata/
+backend/uploads/
+backups/
+
+# Legacy (removed)
+ConnectHub/

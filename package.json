@@ -1,0 +1,21 @@
+{
+  "name": "connecthub-workspace",
+  "version": "2.0.0",
+  "private": true,
+  "description": "ConnectHub workspace — React frontend + Python backend",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend ci && npm --prefix frontend run build",
+    "office": "npm --prefix frontend run office",
+    "start": "npm --prefix frontend run start",
+    "db:dev": "npm --prefix frontend run db:dev",
+    "db:migrate": "cd backend && python scripts/migrate.py migrate",
+    "db:seed": "cd backend && python scripts/migrate.py seed",
+    "db:health": "cd backend && python scripts/migrate.py health",
+    "db:export": "cd backend && python scripts/export_supabase_sql.py",
+    "db:export:schema": "cd backend && python scripts/export_supabase_sql.py --mode schema --output ../exports/connecthub-schema-only.sql"
+  },
+  "engines": {
+    "node": "22.x"
+  }
+}

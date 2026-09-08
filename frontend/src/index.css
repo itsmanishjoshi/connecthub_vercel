@@ -1,0 +1,646 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Legacy styles - will be gradually migrated to design system */
+
+@layer base {
+  :root {
+    /* Accionlabs Brand Colors */
+    /* Background - Cool White */
+    --background: 217 33% 97%;
+    --foreground: 0 0% 0%;
+
+    /* Card colors - White */
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
+
+    /* Popover colors */
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
+
+    /* Primary - Brand Blue */
+    --primary: 217 91% 60%;
+    --primary-dark: 224 76% 40%;
+    --primary-light: 217 91% 70%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary - Action Grey */
+    --secondary: 212 14% 45%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* Muted colors - Cool White */
+    --muted: 217 33% 94%;
+    --muted-foreground: 212 14% 45%;
+
+    /* Accent - Blue (matches primary theme) */
+    --accent: 217 91% 95%;
+    --accent-foreground: 217 91% 30%;
+
+    /* Destructive - Action Red */
+    --destructive: 357 85% 59%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Status Colors - Accionlabs Brand */
+    --status-red: 357 85% 59%;
+    --status-yellow: 39 100% 50%;
+    --status-green: 134 100% 31%;
+    --status-blue: 217 100% 38%;
+    --status-grey: 212 14% 45%;
+
+    /* Border and input */
+    --border: 217 33% 90%;
+    --input: 217 33% 94%;
+    --ring: 217 91% 60%;
+
+    --radius: 1rem;
+
+    /* Accionlabs Gradients */
+    --gradient-background: linear-gradient(135deg, #EBF0F7 0%, #FFFFFF 50%, #FFF8F0 100%);
+    --gradient-primary: linear-gradient(135deg, #EB4B55 0%, #C73C1D 100%);
+    --gradient-accent: linear-gradient(135deg, #0F8F9F 0%, #00A3A3 100%);
+    --gradient-card: linear-gradient(145deg, #FFFFFF 0%, #F5F8FB 100%);
+    --gradient-purple: linear-gradient(135deg, #7B3FF2 0%, #FF1493 100%);
+    
+    /* Shadows */
+    --shadow-colored: 0 10px 30px -5px hsl(357 85% 59% / 0.2);
+    --shadow-colored-lg: 0 20px 40px -10px hsl(357 85% 59% / 0.25);
+    
+    /* Transitions */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dark {
+    --background: 220 25% 12%;
+    --foreground: 0 0% 100%;
+    --card: 220 25% 18%;
+    --card-foreground: 0 0% 100%;
+    --popover: 220 25% 18%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 212 14% 45%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 220 15% 22%;
+    --muted-foreground: 0 0% 72%;
+    --accent: 217 91% 25%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 357 85% 59%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 20% 26%;
+    --input: 220 20% 26%;
+    --ring: 217 91% 60%;
+  }
+
+  /* Accion brand theme — style plate */
+  .accion {
+    --background: 214 40% 96%;
+    --foreground: 213 15% 18%;
+    --card: 0 0% 100%;
+    --card-foreground: 213 15% 18%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 213 15% 18%;
+    --primary: 221 77% 45%;
+    --primary-dark: 221 77% 38%;
+    --primary-light: 199 74% 48%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 213 9% 45%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 214 30% 92%;
+    --muted-foreground: 213 9% 40%;
+    --accent: 188 79% 28%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 356 80% 61%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 24% 86%;
+    --input: 214 24% 90%;
+    --ring: 221 77% 45%;
+    --status-red: 356 80% 61%;
+    --status-yellow: 32 71% 52%;
+    --status-green: 102 100% 20%;
+    --status-blue: 221 77% 45%;
+    --status-grey: 213 9% 45%;
+    --gradient-background: linear-gradient(135deg, #e8f0fc 0%, #ffffff 40%, #f0faf9 100%);
+    --gradient-primary: linear-gradient(90deg, #1a4fc9 0%, #259ecf 50%, #05a393 100%);
+    --gradient-accent: linear-gradient(90deg, #db7b2c 0%, #e520a9 50%, #7b36b0 100%);
+    --gradient-timeline: linear-gradient(90deg, #7b36b0, #1a4fc9, #146800, #db7b2c, #b73734);
+    --gradient-footer: linear-gradient(90deg, #1a4fc9 0%, #7b36b0 25%, #b73734 50%, #db7b2c 75%, #7b36b0 100%);
+    --gradient-card: linear-gradient(145deg, #ffffff 0%, #f4f8fd 100%);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  /* Force scrollbar to always be visible to prevent layout shift */
+  html {
+    overflow-y: scroll;
+    scrollbar-gutter: stable;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  html:not(.dark):not(.accion) {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  html.accion {
+    color-scheme: light;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    overflow-y: scroll !important;
+    scrollbar-gutter: stable;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100%;
+    position: relative;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Prevent auto-zoom on mobile inputs - CRITICAL FIX */
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="password"],
+  input[type="number"],
+  input[type="search"],
+  input[type="url"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+
+  /* Prevent layout shift when modals/dialogs open */
+  body[data-scroll-locked] {
+    overflow-y: scroll !important;
+    padding-right: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  /* Prevent layout shift from Radix UI dropdowns */
+  body[data-radix-scroll-locked] {
+    overflow-y: scroll !important;
+    padding-right: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  /* Ensure main content doesn't shift */
+  main {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  #root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  img, video {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Ensure consistent scrollbar width */
+  ::-webkit-scrollbar {
+    width: 0px;
+    height: 0px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: transparent;
+  }
+
+  /* Hide scrollbar for Firefox */
+  * {
+    scrollbar-width: none;
+  }
+
+  /* Hide scrollbar for IE and Edge */
+  * {
+    -ms-overflow-style: none;
+  }
+
+  body {
+    background: linear-gradient(135deg, hsl(220 60% 97%) 0%, hsl(240 60% 98%) 50%, hsl(260 50% 97%) 100%);
+    background-attachment: fixed;
+  }
+  .dark body {
+    @apply bg-background text-foreground;
+    background: radial-gradient(circle at top, hsl(220 25% 20%), hsl(220 25% 10%));
+    background-attachment: fixed;
+  }
+  html.accion body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--gradient-background);
+    background-attachment: fixed;
+  }
+
+  .accion-shell-bg {
+    background: var(--gradient-background);
+    background-attachment: fixed;
+  }
+
+  .accion-panel-surface {
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.92) 0%, rgba(244, 248, 253, 0.88) 100%);
+    border: 1px solid hsl(214 24% 86% / 0.9);
+  }
+
+  html.accion .accion-brand-bar {
+    background: var(--gradient-footer);
+  }
+
+  html.accion .accion-section-rule {
+    height: 4px;
+    border-radius: 9999px;
+    background: var(--gradient-timeline);
+  }
+}
+
+/* Responsive application utilities. Kept outside Tailwind's utilities layer
+   because important variants can otherwise emit empty selectors for element
+   and attribute rules. */
+  /* Mobile-specific utilities */
+  @media (max-width: 640px) {
+    .mobile-scroll {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    .mobile-scroll::-webkit-scrollbar {
+      display: none;
+    }
+    
+    .mobile-scroll {
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    /* Prevent zoom on input focus */
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"],
+    input[type="password"],
+    input[type="url"],
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
+
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .container {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+
+    .touch-target {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  }
+
+  @media (min-width: 641px) and (max-width: 1023px) {
+    .container {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+  }
+
+  @media (max-width: 1023px) {
+    .app-header {
+      padding-top: 1rem;
+      padding-bottom: 1rem;
+    }
+
+    .app-header__row {
+      gap: 1rem;
+    }
+
+    .app-header__controls {
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    .app-header__search {
+      max-width: 100%;
+    }
+
+    .app-header__sort {
+      display: none;
+    }
+
+    .stats-panel {
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .stats-panel > div {
+      width: 100%;
+    }
+
+    .filter-panel {
+      padding: 0.75rem;
+    }
+  }
+
+  .app-page {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent;
+  }
+  
+  .gradient-border {
+    position: relative;
+    background: linear-gradient(white, white) padding-box,
+                linear-gradient(135deg, hsl(217 91% 55%), hsl(260 60% 60%)) border-box;
+    border: 2px solid transparent;
+  }
+
+  /* Smooth animations */
+  @keyframes slide-in-from-bottom {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .animate-in {
+    animation-duration: 0.4s;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+    animation-fill-mode: both;
+  }
+
+  .fade-in {
+    animation-name: fade-in;
+  }
+
+  .jelly-fab {
+    display: flex;
+    height: 2.5rem;
+    width: auto;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  @media (min-width: 640px) {
+    .jelly-fab {
+      height: 3rem;
+    }
+  }
+
+  .jelly-fab img {
+    transform-origin: 50% 90%;
+    animation: jelly-wave 4.8s ease-in-out infinite;
+  }
+
+  .jelly-fab:hover {
+    opacity: 0.9;
+  }
+
+  .jelly-fab:hover img {
+    animation-duration: 1.6s;
+  }
+
+  @keyframes jelly-wave {
+    0%, 62%, 100% {
+      transform: rotate(0deg) translateY(0);
+    }
+    68% {
+      transform: rotate(11deg) translateY(-2px);
+    }
+    74% {
+      transform: rotate(-8deg) translateY(0);
+    }
+    80% {
+      transform: rotate(9deg) translateY(-2px);
+    }
+    86% {
+      transform: rotate(-3deg) translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .jelly-fab img {
+      animation: none;
+    }
+    .animate-office-in,
+    .animate-scene-drift,
+    .animate-window-glow {
+      animation: none !important;
+    }
+  }
+
+  .slide-in-from-bottom-2 {
+    animation-name: slide-in-from-bottom;
+  }
+
+  .slide-in-from-bottom-4 {
+    animation-name: slide-in-from-bottom;
+  }
+
+  /* Dark fields: typed text, caret, and Chrome/Edge autofill must stay light.
+     Autofill ignores CSS variables in -webkit-text-fill-color, so use literals. */
+  html.dark input,
+  html.dark textarea,
+  html.dark select,
+  html[data-theme="dark"] input,
+  html[data-theme="dark"] textarea,
+  html[data-theme="dark"] select {
+    color: #f8fafc !important;
+    -webkit-text-fill-color: #f8fafc !important;
+    caret-color: #f8fafc !important;
+    color-scheme: dark;
+  }
+
+  html.dark input::placeholder,
+  html.dark textarea::placeholder,
+  html[data-theme="dark"] input::placeholder,
+  html[data-theme="dark"] textarea::placeholder {
+    color: #94a3b8 !important;
+    -webkit-text-fill-color: #94a3b8 !important;
+    opacity: 1;
+  }
+
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active,
+  textarea:-webkit-autofill,
+  textarea:-webkit-autofill:hover,
+  textarea:-webkit-autofill:focus,
+  textarea:-webkit-autofill:active {
+    -webkit-text-fill-color: hsl(var(--foreground)) !important;
+    caret-color: hsl(var(--foreground));
+    box-shadow: 0 0 0 1000px hsl(var(--background)) inset;
+    transition: background-color 9999s ease-in-out 0s;
+  }
+
+  html.dark input:-webkit-autofill,
+  html.dark input:-webkit-autofill:hover,
+  html.dark input:-webkit-autofill:focus,
+  html.dark input:-webkit-autofill:active,
+  html.dark textarea:-webkit-autofill,
+  html.dark textarea:-webkit-autofill:hover,
+  html.dark textarea:-webkit-autofill:focus,
+  html[data-theme="dark"] input:-webkit-autofill,
+  html[data-theme="dark"] input:-webkit-autofill:hover,
+  html[data-theme="dark"] input:-webkit-autofill:focus,
+  html[data-theme="dark"] input:-webkit-autofill:active {
+    -webkit-text-fill-color: #f8fafc !important;
+    caret-color: #f8fafc !important;
+    box-shadow: 0 0 0 1000px hsl(220 25% 18%) inset !important;
+  }
+
+  /* Smooth transitions for all interactive elements */
+  button, a, [role="button"] {
+    transition: var(--transition-smooth);
+  }
+
+  /* Touch-friendly interactions */
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+
+  /* Optimize rendering performance */
+  .will-change-transform {
+    will-change: transform;
+  }
+
+  .will-change-opacity {
+    will-change: opacity;
+  }
+
+  /* GPU acceleration for smooth animations */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
+  }
+
+  /* Responsive text utilities */
+  @media (max-width: 640px) {
+    .text-responsive-base {
+      font-size: 1rem;
+    }
+  }
+
+  /* Scrollable tables: page stays fixed width; table scrolls inside shell */
+  .responsive-table-scroll {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .responsive-table-scroll > table {
+    width: 100%;
+    min-width: 32rem;
+  }
+
+  @media (max-width: 1023px) {
+    .responsive-table-scroll > table {
+      min-width: 40rem;
+    }
+
+    .office-window-surface {
+      min-width: 0;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .responsive-table-scroll > table {
+      min-width: 36rem;
+    }
+  }
+
+  /* Horizontal tab strips inside office windows */
+  .window-tab-scroll {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .window-tab-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Flex/grid children that must shrink inside app shells */
+  .app-shell-pane {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .responsive-text-wrap {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .responsive-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  @media (max-width: 767px) {
+    .responsive-tabs-trigger {
+      white-space: normal;
+      text-align: center;
+      line-height: 1.25;
+    }
+  }
