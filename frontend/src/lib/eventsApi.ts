@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { fetchWithTimeout } from './api/http';
 import { readSnapshot, saveSnapshot, type CachedValue } from './offlineStore';
 
 export interface ReadResult<T> {
@@ -197,7 +198,7 @@ export async function fetchEventBySlugWithSource(slug: string): Promise<ReadResu
   const apiBase = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
   const token = localStorage.getItem('connecthub_token');
   try {
-    const response = await fetch(`${apiBase}/api/events/by-slug/${encodeURIComponent(slug)}`, {
+    const response = await fetchWithTimeout(`${apiBase}/api/events/by-slug/${encodeURIComponent(slug)}`, {
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),

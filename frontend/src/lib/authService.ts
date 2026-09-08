@@ -56,6 +56,10 @@ function readRememberedSession(): { user: User; profile: UserProfile | null } | 
   }
 }
 
+export function getRememberedSession(): { user: User; profile: UserProfile | null } | null {
+  return readRememberedSession();
+}
+
 async function apiRequest(path: string, init: RequestInit = {}) {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);

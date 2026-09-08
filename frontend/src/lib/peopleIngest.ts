@@ -4,6 +4,9 @@ import {
   parseSpreadsheetFile,
   shouldParseSpreadsheetLocally,
 } from './spreadsheetIngest';
+import { fetchWithTimeout } from './api/http';
+
+const INGEST_UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;
 
 export interface IngestedPerson {
   name: string;
@@ -70,18 +73,21 @@ async function previewIngestedPeople(eventId: string, people: IngestedPerson[]) 
 }
 
 async function requestIngestUploadUrl(eventId: string, file: File) {
-  const response = await fetch(`${apiBase()}/api/events/${eventId}/people/ingest-upload-url`, {
-    method: 'POST',
-    headers: {
-      ...authHeaders(),
-      'Content-Type': 'application/json',
+  const response = await fetchWithTimeout(
+    `${apiBase()}/api/events/${eventId}/people/ingest-upload-url`,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        filename: file.name,
+        fileSize: file.size,
+        purpose: 'photos',
+      }),
     },
-    body: JSON.stringify({
-      filename: file.name,
-      fileSize: file.size,
-      purpose: 'photos',
-    }),
-  });
+  );
   if (!response.ok) {
     throw new Error(await readApiError(response, 'Could not start cloud upload'));
   }
@@ -93,16 +99,20 @@ async function requestIngestUploadUrl(eventId: string, file: File) {
 }
 
 async function uploadFileToSignedUrl(file: File, signedUrl: string, token: string) {
-  const response = await fetch(signedUrl, {
-    method: 'PUT',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type':
-        file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'x-upsert': 'true',
+  const response = await fetchWithTimeout(
+    signedUrl,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type':
+          file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'x-upsert': 'true',
+      },
+      body: file,
     },
-    body: file,
-  });
+    INGEST_UPLOAD_TIMEOUT_MS,
+  );
   if (!response.ok) {
     const detail = (await response.text().catch(() => '')).slice(0, 160);
     throw new Error(
@@ -196,14 +206,18 @@ export async function commitIngestedPeople(eventId: string, people: IngestedPers
 export async function importPhotosFromSpreadsheet(eventId: string, file?: File) {
   if (file && file.size > CLOUD_UPLOAD_LIMIT_BYTES) {
     const storagePath = await uploadSpreadsheetViaSupabase(eventId, file);
-    const response = await fetch(`${apiBase()}/api/events/${eventId}/people/import-photos`, {
-      method: 'POST',
-      headers: {
-        ...authHeaders(),
-        'Content-Type': 'application/json',
+    const response = await fetchWithTimeout(
+      `${apiBase()}/api/events/${eventId}/people/import-photos`,
+      {
+        method: 'POST',
+        headers: {
+          ...authHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ storagePath, filename: file.name }),
       },
-      body: JSON.stringify({ storagePath, filename: file.name }),
-    });
+      INGEST_UPLOAD_TIMEOUT_MS,
+    );
     if (!response.ok) {
       throw new Error(await readApiError(response, 'Could not import photos from Excel'));
     }

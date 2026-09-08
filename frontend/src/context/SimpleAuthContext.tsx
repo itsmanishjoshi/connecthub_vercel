@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import * as authService from '../lib/authService';
+import { getRememberedSession } from '../lib/authService';
 import * as attendeeDataService from '../services/attendeeDataService';
 import { flushPendingSync } from '../services/syncQueue';
 import { adoptGuestData, setUserScope } from '../utils/localStorage';
@@ -61,50 +62,84 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Initialize auth state
   useEffect(() => {
+    let cancelled = false;
+
+    const applySession = (
+      user: authService.User,
+      userProfile: UserProfile | null,
+    ) => {
+      setCurrentUserId(user.id);
+      setIsAdmin(user.isAdmin);
+      setMustChangePassword(Boolean(user.mustChangePassword));
+      adoptGuestData(user.id);
+      setUserScope(user.id);
+      void attendeeDataService.migrateLocalDataOnce(user.id).then(() => flushPendingSync());
+      void hydrateUserDataFromDb();
+      setProfile(userProfile);
+      setMode('auth');
+    };
+
     const initAuth = async () => {
       const token = localStorage.getItem('connecthub_token');
-      
-      if (token) {
-        try {
-          const { user, profile: userProfile } = await authService.restoreSession();
-          setCurrentUserId(user.id);
-          setIsAdmin(user.isAdmin);
-          setMustChangePassword(Boolean(user.mustChangePassword));
-          adoptGuestData(user.id);
-          setUserScope(user.id);
-          void attendeeDataService.migrateLocalDataOnce(user.id).then(() => flushPendingSync());
-          void hydrateUserDataFromDb();
-          if (userProfile) {
-            setProfile(userProfile);
-          } else {
-            const newProfile: UserProfile = {
-              id: user.id,
-              firstName: '',
-              lastName: '',
-              profileCompleted: false,
-              onboardingStep: 0,
-              isAdmin: user.isAdmin,
-            };
-            const saved = await authService.updateProfile(user.id, newProfile);
-            setProfile(saved || newProfile);
-          }
-          setMode('auth');
-        } catch (error) {
-          console.error('Failed to load profile:', error);
-          // Clear invalid session
-          localStorage.removeItem('current_user_id');
-          localStorage.removeItem('current_username');
-          localStorage.removeItem('connecthub_token');
-          localStorage.removeItem('connecthub_session_snapshot');
-          setUserScope(null);
-          setMode('needsAuth');
+
+      if (!token) {
+        setMode('needsAuth');
+        return;
+      }
+
+      const remembered = getRememberedSession();
+      if (remembered) {
+        applySession(remembered.user, remembered.profile);
+      }
+
+      const failsafeId = window.setTimeout(() => {
+        if (cancelled || remembered) return;
+        localStorage.removeItem('current_user_id');
+        localStorage.removeItem('current_username');
+        localStorage.removeItem('connecthub_token');
+        localStorage.removeItem('connecthub_session_snapshot');
+        setUserScope(null);
+        setMode('needsAuth');
+      }, 12_000);
+
+      try {
+        const { user, profile: userProfile } = await authService.restoreSession();
+        window.clearTimeout(failsafeId);
+        if (cancelled) return;
+
+        if (userProfile) {
+          applySession(user, userProfile);
+          return;
         }
-      } else {
+
+        const newProfile: UserProfile = {
+          id: user.id,
+          firstName: '',
+          lastName: '',
+          profileCompleted: false,
+          onboardingStep: 0,
+          isAdmin: user.isAdmin,
+        };
+        const saved = await authService.updateProfile(user.id, newProfile);
+        if (cancelled) return;
+        applySession(user, saved || newProfile);
+      } catch (error) {
+        window.clearTimeout(failsafeId);
+        if (cancelled) return;
+        console.error('Failed to load profile:', error);
+        if (remembered) {
+          return;
+        }
+        localStorage.removeItem('current_user_id');
+        localStorage.removeItem('current_username');
+        localStorage.removeItem('connecthub_token');
+        localStorage.removeItem('connecthub_session_snapshot');
+        setUserScope(null);
         setMode('needsAuth');
       }
     };
 
-    initAuth();
+    void initAuth();
 
     const expireSession = () => {
       setProfile(null);
@@ -115,7 +150,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setMode('needsAuth');
     };
     window.addEventListener('connecthub:session-expired', expireSession);
-    return () => window.removeEventListener('connecthub:session-expired', expireSession);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('connecthub:session-expired', expireSession);
+    };
   }, []);
 
   const signIn = async (username: string, password: string) => {

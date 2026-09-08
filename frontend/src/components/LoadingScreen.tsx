@@ -11,6 +11,10 @@ export const LoadingScreen = () => {
           {APP_NAME}
         </h1>
         <BrandTagline className="mt-1.5 animate-in fade-in duration-700 text-sm" />
+        <div className="relative mt-6 h-10 w-10">
+          <div className="absolute inset-0 rounded-full border-4 border-primary/20" />
+          <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+        </div>
       </div>
     </div>
   );

@@ -141,6 +141,7 @@ Login → open an event → Jelly **Brief me** → add a note.
 
 | Symptom | Fix |
 |---------|-----|
+| 404 on page reload (e.g. `/settings`, `/connect-hub/...`) | Frontend service needs SPA fallback in `vercel.json` → `services.frontend.rewrites` to `/index.html` (already configured) |
 | Build asks for `vercel.json` | Ensure repo root has `vercel.json` (included in latest `master`) |
 | `database: error` | Check Supabase URI, password encoding (`@` → `%40`), `sslmode=require` |
 | `ai: missing` | Set `GROK_API_KEY` + `AI_PROVIDER=grok` on Vercel backend env |
